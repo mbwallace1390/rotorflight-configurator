@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import * as marked from 'marked';
 import semver from "semver";
 
@@ -112,11 +113,14 @@ tab.initialize = function (callback) {
                 $('div.release_info #unifiedTargetInfo').hide();
             }
 
-            var formattedNotes = summary.notes; //.replace(/#(\d+)/g, '[#$1](https://github.com/rotorflight/rotorflight-firmware/pull/$1)');
-            formattedNotes = marked.parse(formattedNotes);
+            var formattedNotes = summary.notes ?? ""; //.replace(/#(\d+)/g, '[#$1](https://github.com/rotorflight/rotorflight-firmware/pull/$1)');
+            formattedNotes = DOMPurify.sanitize(marked.parse(formattedNotes));
             $('div.release_info .notes').html(formattedNotes);
             $('div.release_info .notes').find('a').each(function() {
-                $(this).attr('target', '_blank');
+                $(this).attr({
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                });
             });
 
             $('div.release_info').slideDown();
@@ -196,6 +200,11 @@ tab.initialize = function (callback) {
         }
 
         function processBoardOptions(releaseData, buildLevel) {
+            if (!Array.isArray(releaseData) || releaseData.length === 0) {
+                populateBoardOptions();
+                return;
+            }
+
             var releases = {};
             const filenameExpression = /^rotorflight_([\d]+[.][\d]+[.][\d]+((-[A-Za-z][\w]*)|(-[\d]+))?)_([A-Za-z][\w]*)[.]hex$/;
             releaseData.forEach(function(release) {

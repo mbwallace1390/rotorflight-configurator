@@ -47,11 +47,11 @@ ReleaseChecker.prototype.loadReleaseData = function (processFunction) {
 
 
 ReleaseChecker.prototype._processReleaseData = function (releaseData, processFunction) {
-    if (releaseData) {
+    if (Array.isArray(releaseData)) {
         processFunction(releaseData);
     } else {
-        GUI.log(i18n.getMessage('releaseCheckNoInfo',[self._releaseName]));
+        GUI.log(i18n.getMessage('releaseCheckNoInfo',[this._releaseName]));
 
-        processFunction();
+        processFunction([]);
     }
 };

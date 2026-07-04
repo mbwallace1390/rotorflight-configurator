@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import semver from "semver";
 
 import { CliAutoComplete } from "@/js/CliAutoComplete.js";
@@ -375,7 +376,7 @@ export function checkForConfiguratorUpdates() {
     releaseChecker.loadReleaseData(notifyOutdatedVersion);
 }
 
-function notifyOutdatedVersion(releaseData) {
+function notifyOutdatedVersion(releaseData = []) {
     const versions = releaseData.filter(function (version) {
         var versionFromTagExpression = /release\/(.*)/;
         var match = versionFromTagExpression.exec(version.tag_name);
@@ -401,7 +402,7 @@ function notifyOutdatedVersion(releaseData) {
     {
         const dialog = $('.dialogConfiguratorUpdate')[0];
 
-        $('.dialogConfiguratorUpdate-content').html(message);
+        $('.dialogConfiguratorUpdate-content').html(DOMPurify.sanitize(message));
 
         $('.dialogConfiguratorUpdate-closebtn').click(function() {
             dialog.close();
@@ -421,7 +422,7 @@ function notifyOutdatedVersion(releaseData) {
             configuratorVersionDialog(message, CONFIGURATOR.allReleasesUrl);
         }
     }
-    else if (semver.lt(CONFIGURATOR.version, CONFIGURATOR.latestVersion)) {
+    else if (CONFIGURATOR.latestVersion && semver.lt(CONFIGURATOR.version, CONFIGURATOR.latestVersion)) {
         const message = i18n.getMessage('configuratorUpdateNotice', [CONFIGURATOR.latestVersion, CONFIGURATOR.latestVersionReleaseUrl]);
         configuratorVersionDialog(message, CONFIGURATOR.latestVersionReleaseUrl);
     }

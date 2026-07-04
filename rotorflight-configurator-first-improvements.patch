@@ -1,0 +1,94 @@
+diff --git a/src/js/main.js b/src/js/main.js
+index 2beb486..778553f 100644
+--- a/src/js/main.js
++++ b/src/js/main.js
+@@ -1,3 +1,4 @@
++import DOMPurify from "dompurify";
+ import semver from "semver";
+ 
+ import { CliAutoComplete } from "@/js/CliAutoComplete.js";
+@@ -375,7 +376,7 @@ export function checkForConfiguratorUpdates() {
+     releaseChecker.loadReleaseData(notifyOutdatedVersion);
+ }
+ 
+-function notifyOutdatedVersion(releaseData) {
++function notifyOutdatedVersion(releaseData = []) {
+     const versions = releaseData.filter(function (version) {
+         var versionFromTagExpression = /release\/(.*)/;
+         var match = versionFromTagExpression.exec(version.tag_name);
+@@ -401,7 +402,7 @@ function notifyOutdatedVersion(releaseData) {
+     {
+         const dialog = $('.dialogConfiguratorUpdate')[0];
+ 
+-        $('.dialogConfiguratorUpdate-content').html(message);
++        $('.dialogConfiguratorUpdate-content').html(DOMPurify.sanitize(message));
+ 
+         $('.dialogConfiguratorUpdate-closebtn').click(function() {
+             dialog.close();
+@@ -421,7 +422,7 @@ function notifyOutdatedVersion(releaseData) {
+             configuratorVersionDialog(message, CONFIGURATOR.allReleasesUrl);
+         }
+     }
+-    else if (semver.lt(CONFIGURATOR.version, CONFIGURATOR.latestVersion)) {
++    else if (CONFIGURATOR.latestVersion && semver.lt(CONFIGURATOR.version, CONFIGURATOR.latestVersion)) {
+         const message = i18n.getMessage('configuratorUpdateNotice', [CONFIGURATOR.latestVersion, CONFIGURATOR.latestVersionReleaseUrl]);
+         configuratorVersionDialog(message, CONFIGURATOR.latestVersionReleaseUrl);
+     }
+diff --git a/src/js/release_checker.js b/src/js/release_checker.js
+index fc05346..8dfd6a4 100644
+--- a/src/js/release_checker.js
++++ b/src/js/release_checker.js
+@@ -47,11 +47,11 @@ ReleaseChecker.prototype.loadReleaseData = function (processFunction) {
+ 
+ 
+ ReleaseChecker.prototype._processReleaseData = function (releaseData, processFunction) {
+-    if (releaseData) {
++    if (Array.isArray(releaseData)) {
+         processFunction(releaseData);
+     } else {
+-        GUI.log(i18n.getMessage('releaseCheckNoInfo',[self._releaseName]));
++        GUI.log(i18n.getMessage('releaseCheckNoInfo',[this._releaseName]));
+ 
+-        processFunction();
++        processFunction([]);
+     }
+ };
+diff --git a/src/js/tabs/firmware_flasher.js b/src/js/tabs/firmware_flasher.js
+index bc968b7..b997ea0 100644
+--- a/src/js/tabs/firmware_flasher.js
++++ b/src/js/tabs/firmware_flasher.js
+@@ -1,3 +1,4 @@
++import DOMPurify from "dompurify";
+ import * as marked from 'marked';
+ import semver from "semver";
+ 
+@@ -112,11 +113,14 @@ tab.initialize = function (callback) {
+                 $('div.release_info #unifiedTargetInfo').hide();
+             }
+ 
+-            var formattedNotes = summary.notes; //.replace(/#(\d+)/g, '[#$1](https://github.com/rotorflight/rotorflight-firmware/pull/$1)');
+-            formattedNotes = marked.parse(formattedNotes);
++            var formattedNotes = summary.notes ?? ""; //.replace(/#(\d+)/g, '[#$1](https://github.com/rotorflight/rotorflight-firmware/pull/$1)');
++            formattedNotes = DOMPurify.sanitize(marked.parse(formattedNotes));
+             $('div.release_info .notes').html(formattedNotes);
+             $('div.release_info .notes').find('a').each(function() {
+-                $(this).attr('target', '_blank');
++                $(this).attr({
++                    target: '_blank',
++                    rel: 'noopener noreferrer',
++                });
+             });
+ 
+             $('div.release_info').slideDown();
+@@ -196,6 +200,11 @@ tab.initialize = function (callback) {
+         }
+ 
+         function processBoardOptions(releaseData, buildLevel) {
++            if (!Array.isArray(releaseData) || releaseData.length === 0) {
++                populateBoardOptions();
++                return;
++            }
++
+             var releases = {};
+             const filenameExpression = /^rotorflight_([\d]+[.][\d]+[.][\d]+((-[A-Za-z][\w]*)|(-[\d]+))?)_([A-Za-z][\w]*)[.]hex$/;
+             releaseData.forEach(function(release) {
