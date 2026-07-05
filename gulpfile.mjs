@@ -3,6 +3,7 @@ import child_process from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import stream from "node:stream";
+import { promisify } from "node:util";
 
 import innoSetup from "@quanle94/innosetup";
 import { ZipArchive } from "archiver";
@@ -46,6 +47,8 @@ const NWJS_ARCH = {
   arm64: "arm64",
 };
 const NWJS_VERSION_MANIFEST = "https://nwjs.io/versions.json";
+
+const execFile = promisify(child_process.execFile);
 
 const context = {};
 parseArgs();
@@ -366,51 +369,40 @@ function build_redist_rpm() {
 
 function build_redist_osx() {
   return runAsync(async () => {
-    const appdmg = (await import("appdmg")).default;
+    const { arch } = context.target;
+    const volumeName = "Rotorflight Configurator";
+    const stagingPath = path.join(REDIST_DIR, `.dmg-staging-${arch}`);
+    const sourceApp = path.join(context.appdir, `${pkg.name}.app`);
+    const stagedApp = path.join(stagingPath, `${volumeName}.app`);
+    const targetPath = path.join(
+      REDIST_DIR,
+      `${pkg.name}_${pkg.version}_macos_${arch}.dmg`,
+    );
 
-    const targetPath = `${REDIST_DIR}/${pkg.name}_${pkg.version}_macos_${context.target.arch}.dmg`;
+    await fs.rm(stagingPath, { recursive: true, force: true });
+    await fs.mkdir(stagingPath, { recursive: true });
 
-    await new Promise((resolve, reject) => {
-      const builder = appdmg({
-        target: targetPath,
-        basepath: context.appdir,
-        specification: {
-          title: "Rotorflight Configurator",
-          contents: [
-            { x: 448, y: 342, type: "link", path: "/Applications" },
-            {
-              x: 192,
-              y: 344,
-              type: "file",
-              path: `${pkg.name}.app`,
-              name: "Rotorflight Configurator.app",
-            },
-          ],
-          background: `${import.meta.dirname}/assets/osx/dmg-background.png`,
-          format: "UDZO",
-          window: {
-            size: {
-              width: 638,
-              height: 479,
-            },
-          },
-        },
-      });
+    try {
+      // ditto preserves the metadata and executable permissions in the app bundle.
+      await execFile("ditto", [sourceApp, stagedApp]);
+      await fs.symlink("/Applications", path.join(stagingPath, "Applications"));
 
-      builder.on("progress", (info) =>
-        logger.info(
-          info.current +
-            "/" +
-            info.total +
-            " " +
-            info.type +
-            " " +
-            (info.title || info.status),
-        ),
-      );
-      builder.on("error", reject);
-      builder.on("finish", resolve);
-    });
+      // appdmg mounts a temporary image and can fail when macOS has already
+      // detached it. Creating the compressed image directly avoids that race.
+      await execFile("hdiutil", [
+        "create",
+        "-volname",
+        volumeName,
+        "-srcfolder",
+        stagingPath,
+        "-ov",
+        "-format",
+        "UDZO",
+        targetPath,
+      ]);
+    } finally {
+      await fs.rm(stagingPath, { recursive: true, force: true });
+    }
   });
 }
 
