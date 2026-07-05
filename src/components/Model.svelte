@@ -60,8 +60,12 @@
       return;
     }
 
-    renderer.forceContextLoss();
+    const context = renderer.getContext();
+    if (!context.isContextLost()) {
+      renderer.forceContextLoss();
+    }
     renderer.dispose();
+    renderer = undefined;
   });
 
   function loadGLTF(modelName) {

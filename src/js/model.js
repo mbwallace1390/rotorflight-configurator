@@ -89,6 +89,14 @@ Model.prototype.resize = function () {
 };
 
 Model.prototype.dispose = function () {
-    this.renderer.forceContextLoss();
+    if (!this.renderer) {
+        return;
+    }
+
+    const context = this.renderer.getContext();
+    if (!context.isContextLost()) {
+        this.renderer.forceContextLoss();
+    }
     this.renderer.dispose();
+    this.renderer = null;
 };
