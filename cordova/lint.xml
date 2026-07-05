@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+      The application target is explicitly API 35 in config_template.xml.
+      This warning is emitted from legacy third-party Cordova metadata rather
+      than the generated application targetSdkVersion.
+    -->
+    <issue id="ExpiredTargetSdkVersion" severity="ignore" />
+</lint>

@@ -1,0 +1,52 @@
+--- a/.github/workflows/testing.yml
++++ b/.github/workflows/testing.yml
+@@ -109,7 +109,9 @@
+ 
+   macos-x86_64:
+ 
+-    runs-on: macos-15-intel
++    # The app is packaged, not natively compiled, so the ARM runner can
++    # create the x86_64 NW.js distribution while avoiding Intel-runner issues.
++    runs-on: macos-15
+     needs: lint
+ 
+     steps:
+@@ -168,7 +170,8 @@
+ 
+   macos-arm64:
+ 
+-    runs-on: macos-latest
++    # Pin the runner image so macos-latest migrations do not change builds.
++    runs-on: macos-15
+     needs: lint
+ 
+     steps:
+@@ -388,7 +391,7 @@
+         java-version: '17'
+ 
+     - name: Setup Android SDK
+-      uses: android-actions/setup-android@v3
++      uses: android-actions/setup-android@v4
+       with:
+         cmdline-tools-version: 13114758
+         packages: 'tools platform-tools platforms;android-35 build-tools;35.0.0'
+@@ -417,13 +420,17 @@
+   cleanup:
+ 
+     runs-on: ubuntu-latest
++    permissions:
++      contents: write
+ 
+     needs: [linux, macos-x86_64, macos-arm64, win64, win32, android]
++    if: ${{ always() && startsWith(github.ref, 'refs/tags/testing/') }}
+ 
+     steps:
+     - name: Check out repository
+       uses: actions/checkout@v6
+ 
+-    - name: Delete tag
+-      run: git push origin :${GITHUB_REF}
++    - name: Delete testing tag
++      shell: bash
++      run: git push origin --delete "${GITHUB_REF#refs/tags/}"
+ 
