@@ -95,13 +95,8 @@ public final class BlackboxIntent extends CordovaPlugin {
         CallbackContext callbackContext = pendingPickerCallback;
         pendingPickerCallback = null;
 
-        if (callbackContext == null) {
-            showNativeError("The Blackbox file selection was lost. Please try again.");
-            return;
-        }
-
         if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
-            callbackContext.error("selection_cancelled");
+            sendError(callbackContext, "selection_cancelled");
             return;
         }
 
@@ -117,15 +112,17 @@ public final class BlackboxIntent extends CordovaPlugin {
             }
         }
 
+        // Switching the flight controller from serial to USB mass storage can
+        // reset Cordova while Android Files is open. The JavaScript callback may
+        // be gone, but the selected content URI is still valid and must be sent
+        // directly to the Blackbox app.
         openBlackbox(selectedUri, callbackContext);
     }
 
     private void finishPickerWithError(String message) {
         CallbackContext callbackContext = pendingPickerCallback;
         pendingPickerCallback = null;
-        if (callbackContext != null) {
-            callbackContext.error(message);
-        }
+        sendError(callbackContext, message);
     }
 
     private void openBlackbox(String fileUrl, CallbackContext callbackContext) {
@@ -144,14 +141,14 @@ public final class BlackboxIntent extends CordovaPlugin {
 
                 if (filePath == null) {
                     showNativeError("The selected Blackbox file path is invalid.");
-                    callbackContext.error("invalid_file_url");
+                    sendError(callbackContext, "invalid_file_url");
                     return;
                 }
 
                 File file = new File(filePath);
                 if (!file.isFile()) {
                     showNativeError("The selected Blackbox file could not be found.");
-                    callbackContext.error("file_not_found");
+                    sendError(callbackContext, "file_not_found");
                     return;
                 }
 
@@ -165,7 +162,7 @@ public final class BlackboxIntent extends CordovaPlugin {
             openBlackbox(sharedUri, callbackContext);
         } catch (IllegalArgumentException | SecurityException error) {
             showNativeError("Android could not share the selected Blackbox log.");
-            callbackContext.error("unable_to_share_log: " + error.getMessage());
+            sendError(callbackContext, "unable_to_share_log: " + error.getMessage());
         }
     }
 
@@ -185,18 +182,30 @@ public final class BlackboxIntent extends CordovaPlugin {
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
                 activity.startActivity(intent);
-                callbackContext.success();
+                sendSuccess(callbackContext);
             } catch (ActivityNotFoundException error) {
                 showNativeError("Rotorflight Blackbox Android is not installed.");
-                callbackContext.error("blackbox_not_installed");
+                sendError(callbackContext, "blackbox_not_installed");
             } catch (IllegalArgumentException | SecurityException error) {
                 showNativeError("Android blocked access to the selected Blackbox log.");
-                callbackContext.error("unable_to_share_log: " + error.getMessage());
+                sendError(callbackContext, "unable_to_share_log: " + error.getMessage());
             } catch (RuntimeException error) {
                 showNativeError("Rotorflight Blackbox could not be opened.");
-                callbackContext.error("unable_to_open_blackbox: " + error.getMessage());
+                sendError(callbackContext, "unable_to_open_blackbox: " + error.getMessage());
             }
         });
+    }
+
+    private void sendSuccess(CallbackContext callbackContext) {
+        if (callbackContext != null) {
+            callbackContext.success();
+        }
+    }
+
+    private void sendError(CallbackContext callbackContext, String message) {
+        if (callbackContext != null) {
+            callbackContext.error(message);
+        }
     }
 
     private void showNativeError(String message) {
@@ -208,11 +217,13 @@ public final class BlackboxIntent extends CordovaPlugin {
 
     @Override
     public void onReset() {
-        finishPickerWithError("picker_cancelled");
+        // The Android activity result can still arrive after a Cordova reset.
+        // Do not treat loss of the JavaScript callback as loss of the file URI.
+        pendingPickerCallback = null;
     }
 
     @Override
     public void onDestroy() {
-        finishPickerWithError("picker_cancelled");
+        pendingPickerCallback = null;
     }
 }
