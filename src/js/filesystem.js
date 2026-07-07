@@ -198,13 +198,15 @@ if (__BACKEND__ === "cordova") {
           writer.onwriteend = null;
 
           if (/\.BBL$/i.test(entry.name)) {
-            window.dispatchEvent(new CustomEvent("rotorflight:blackbox-log-closed", {
-              detail: {
-                name: entry.name,
-                url: entry.toURL(),
-                mimeType: "application/x-blackbox-log",
-              },
-            }));
+            window.dispatchEvent(
+              new CustomEvent("rotorflight:blackbox-log-closed", {
+                detail: {
+                  name: entry.name,
+                  url: entry.toURL(),
+                  mimeType: "application/x-blackbox-log",
+                },
+              }),
+            );
           }
         },
       };
