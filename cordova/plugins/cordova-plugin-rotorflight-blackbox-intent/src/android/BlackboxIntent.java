@@ -176,11 +176,13 @@ public final class BlackboxIntent extends CordovaPlugin {
             try {
                 Intent intent = new Intent(Intent.ACTION_VIEW)
                     .setComponent(new ComponentName(BLACKBOX_PACKAGE, BLACKBOX_ACTIVITY))
-                    .setDataAndType(sharedUri, BLACKBOX_MIME_TYPE)
-                    .setClipData(ClipData.newRawUri("Rotorflight Blackbox log", sharedUri))
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    .setDataAndType(sharedUri, BLACKBOX_MIME_TYPE);
+                intent.setClipData(
+                    ClipData.newRawUri("Rotorflight Blackbox log", sharedUri)
+                );
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
                 activity.startActivity(intent);
                 callbackContext.success();
