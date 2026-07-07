@@ -170,11 +170,6 @@ public final class BlackboxIntent extends CordovaPlugin {
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-                if (intent.resolveActivity(activity.getPackageManager()) == null) {
-                    callbackContext.error("blackbox_not_installed");
-                    return;
-                }
-
                 activity.grantUriPermission(
                     BLACKBOX_PACKAGE,
                     sharedUri,
