@@ -176,6 +176,7 @@ if (__BACKEND__ === "cordova") {
 
       let resolve = null;
       let reject = null;
+      let closed = false;
 
       writer.onwriteend = () => {
         if (writer.error) reject(writer.error);
@@ -192,7 +193,19 @@ if (__BACKEND__ === "cordova") {
           });
         },
         close() {
+          if (closed) return;
+          closed = true;
           writer.onwriteend = null;
+
+          if (/\.BBL$/i.test(entry.name)) {
+            window.dispatchEvent(new CustomEvent("rotorflight:blackbox-log-closed", {
+              detail: {
+                name: entry.name,
+                url: entry.toURL(),
+                mimeType: "application/x-blackbox-log",
+              },
+            }));
+          }
         },
       };
     } catch (err) {
