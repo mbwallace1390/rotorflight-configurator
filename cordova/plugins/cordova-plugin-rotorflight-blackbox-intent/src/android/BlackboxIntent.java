@@ -7,6 +7,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Bundle;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
@@ -27,8 +28,10 @@ public final class BlackboxIntent extends CordovaPlugin {
     private static final String BLACKBOX_ACTIVITY =
         "org.rotorflight.blackbox.MainActivity";
     private static final String BLACKBOX_MIME_TYPE = "application/x-blackbox-log";
+    private static final String STATE_PICKER_ACTIVE = "picker_active";
 
     private CallbackContext pendingPickerCallback;
+    private boolean pickerActive;
 
     @Override
     public boolean execute(
@@ -56,11 +59,12 @@ public final class BlackboxIntent extends CordovaPlugin {
     }
 
     private void launchDocumentPicker(CallbackContext callbackContext) {
-        if (pendingPickerCallback != null) {
+        if (pickerActive) {
             callbackContext.error("picker_busy");
             return;
         }
 
+        pickerActive = true;
         pendingPickerCallback = callbackContext;
         PluginResult pendingResult = new PluginResult(PluginResult.Status.NO_RESULT);
         pendingResult.setKeepCallback(true);
@@ -94,13 +98,17 @@ public final class BlackboxIntent extends CordovaPlugin {
 
         CallbackContext callbackContext = pendingPickerCallback;
         pendingPickerCallback = null;
+        pickerActive = false;
 
         if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
+            showNativeError("No Blackbox log was selected.");
             sendError(callbackContext, "selection_cancelled");
             return;
         }
 
         Uri selectedUri = data.getData();
+        showNativeStatus("Blackbox log selected. Opening viewer...");
+
         int takeFlags = data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
         if (takeFlags != 0) {
             try {
@@ -119,9 +127,26 @@ public final class BlackboxIntent extends CordovaPlugin {
         openBlackbox(selectedUri, callbackContext);
     }
 
+    @Override
+    public Bundle onSaveInstanceState() {
+        Bundle state = new Bundle();
+        state.putBoolean(STATE_PICKER_ACTIVE, pickerActive);
+        return state;
+    }
+
+    @Override
+    public void onRestoreStateForActivityResult(
+        Bundle state,
+        CallbackContext callbackContext
+    ) {
+        pickerActive = state != null && state.getBoolean(STATE_PICKER_ACTIVE, false);
+        pendingPickerCallback = pickerActive ? callbackContext : null;
+    }
+
     private void finishPickerWithError(String message) {
         CallbackContext callbackContext = pendingPickerCallback;
         pendingPickerCallback = null;
+        pickerActive = false;
         sendError(callbackContext, message);
     }
 
@@ -161,8 +186,11 @@ public final class BlackboxIntent extends CordovaPlugin {
 
             openBlackbox(sharedUri, callbackContext);
         } catch (IllegalArgumentException | SecurityException error) {
-            showNativeError("Android could not share the selected Blackbox log.");
-            sendError(callbackContext, "unable_to_share_log: " + error.getMessage());
+            showNativeError(
+                "Android could not share the selected Blackbox log: "
+                    + safeMessage(error)
+            );
+            sendError(callbackContext, "unable_to_share_log: " + safeMessage(error));
         }
     }
 
@@ -171,29 +199,76 @@ public final class BlackboxIntent extends CordovaPlugin {
 
         activity.runOnUiThread(() -> {
             try {
-                Intent intent = new Intent(Intent.ACTION_VIEW)
-                    .setComponent(new ComponentName(BLACKBOX_PACKAGE, BLACKBOX_ACTIVITY))
-                    .setDataAndType(sharedUri, BLACKBOX_MIME_TYPE);
-                intent.setClipData(
-                    ClipData.newRawUri("Rotorflight Blackbox log", sharedUri)
+                activity.grantUriPermission(
+                    BLACKBOX_PACKAGE,
+                    sharedUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
                 );
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
-                activity.startActivity(intent);
+                Intent viewIntent = createViewIntent(sharedUri);
+                try {
+                    activity.startActivity(viewIntent);
+                    sendSuccess(callbackContext);
+                    return;
+                } catch (ActivityNotFoundException viewError) {
+                    // Some Android builds are stricter about VIEW resolution.
+                    // Blackbox also declares ACTION_SEND for the same log types.
+                }
+
+                Intent sendIntent = createSendIntent(sharedUri);
+                activity.startActivity(sendIntent);
                 sendSuccess(callbackContext);
             } catch (ActivityNotFoundException error) {
-                showNativeError("Rotorflight Blackbox Android is not installed.");
+                showNativeError(
+                    "Rotorflight Blackbox could not be found. Open it once from the app drawer, then retry."
+                );
                 sendError(callbackContext, "blackbox_not_installed");
             } catch (IllegalArgumentException | SecurityException error) {
-                showNativeError("Android blocked access to the selected Blackbox log.");
-                sendError(callbackContext, "unable_to_share_log: " + error.getMessage());
+                showNativeError(
+                    "Android blocked the Blackbox handoff: " + safeMessage(error)
+                );
+                sendError(callbackContext, "unable_to_share_log: " + safeMessage(error));
             } catch (RuntimeException error) {
-                showNativeError("Rotorflight Blackbox could not be opened.");
-                sendError(callbackContext, "unable_to_open_blackbox: " + error.getMessage());
+                showNativeError(
+                    "Rotorflight Blackbox could not be opened: " + safeMessage(error)
+                );
+                sendError(callbackContext, "unable_to_open_blackbox: " + safeMessage(error));
             }
         });
+    }
+
+    private Intent createViewIntent(Uri sharedUri) {
+        Intent intent = new Intent(Intent.ACTION_VIEW)
+            .setComponent(new ComponentName(BLACKBOX_PACKAGE, BLACKBOX_ACTIVITY))
+            .setDataAndType(sharedUri, BLACKBOX_MIME_TYPE);
+        intent.setClipData(
+            ClipData.newRawUri("Rotorflight Blackbox log", sharedUri)
+        );
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        return intent;
+    }
+
+    private Intent createSendIntent(Uri sharedUri) {
+        Intent intent = new Intent(Intent.ACTION_SEND)
+            .setPackage(BLACKBOX_PACKAGE)
+            .setType(BLACKBOX_MIME_TYPE)
+            .putExtra(Intent.EXTRA_STREAM, sharedUri);
+        intent.setClipData(
+            ClipData.newRawUri("Rotorflight Blackbox log", sharedUri)
+        );
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        return intent;
+    }
+
+    private static String safeMessage(Throwable error) {
+        String message = error.getMessage();
+        return message == null || message.trim().isEmpty()
+            ? error.getClass().getSimpleName()
+            : message;
     }
 
     private void sendSuccess(CallbackContext callbackContext) {
@@ -208,6 +283,13 @@ public final class BlackboxIntent extends CordovaPlugin {
         }
     }
 
+    private void showNativeStatus(String message) {
+        Activity activity = cordova.getActivity();
+        activity.runOnUiThread(() ->
+            Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+        );
+    }
+
     private void showNativeError(String message) {
         Activity activity = cordova.getActivity();
         activity.runOnUiThread(() ->
@@ -217,8 +299,8 @@ public final class BlackboxIntent extends CordovaPlugin {
 
     @Override
     public void onReset() {
-        // The Android activity result can still arrive after a Cordova reset.
-        // Do not treat loss of the JavaScript callback as loss of the file URI.
+        // Keep pickerActive true so an Android activity recreation can restore
+        // the result route. The JavaScript callback itself may be replaced.
         pendingPickerCallback = null;
     }
 
