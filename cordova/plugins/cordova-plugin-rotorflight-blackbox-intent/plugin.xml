@@ -37,6 +37,6 @@
 
         <resource-file
             src="src/android/blackbox_file_paths.xml"
-            target="app/src/main/res/xml/blackbox_file_paths.xml" />
+            target="res/xml/blackbox_file_paths.xml" />
     </platform>
 </plugin>
