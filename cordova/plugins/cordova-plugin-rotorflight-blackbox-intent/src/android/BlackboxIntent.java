@@ -44,25 +44,40 @@ public final class BlackboxIntent extends CordovaPlugin {
         }
 
         if (ACTION_PICK_AND_OPEN.equals(action)) {
-            launchNativePicker(callbackContext);
+            launchBlackboxForManualSelection(callbackContext);
             return true;
         }
 
         return false;
     }
 
-    private void launchNativePicker(CallbackContext callbackContext) {
+    private void launchBlackboxForManualSelection(CallbackContext callbackContext) {
         Activity activity = cordova.getActivity();
         activity.runOnUiThread(() -> {
             try {
-                Intent intent = new Intent(activity, BlackboxPickerActivity.class);
+                Intent intent = new Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_LAUNCHER)
+                    .setComponent(new ComponentName(BLACKBOX_PACKAGE, BLACKBOX_ACTIVITY));
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
                 activity.startActivity(intent);
+                Toast.makeText(
+                    activity,
+                    "Mass storage is active. Open the log from Blackbox.",
+                    Toast.LENGTH_LONG
+                ).show();
                 callbackContext.success();
+            } catch (ActivityNotFoundException error) {
+                showNativeError(
+                    "Rotorflight Blackbox could not be found. Open it once from the app drawer, then retry."
+                );
+                callbackContext.error("blackbox_not_installed");
             } catch (RuntimeException error) {
                 showNativeError(
-                    "Android could not open the Blackbox file picker: " + safeMessage(error)
+                    "Rotorflight Blackbox could not be opened: " + safeMessage(error)
                 );
-                callbackContext.error("unable_to_open_picker: " + safeMessage(error));
+                callbackContext.error("unable_to_open_blackbox: " + safeMessage(error));
             }
         });
     }
