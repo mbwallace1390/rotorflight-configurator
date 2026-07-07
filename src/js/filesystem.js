@@ -202,7 +202,7 @@ if (__BACKEND__ === "cordova") {
               new CustomEvent("rotorflight:blackbox-log-closed", {
                 detail: {
                   name: entry.name,
-                  url: entry.toURL(),
+                  url: entry.nativeURL,
                   mimeType: "application/x-blackbox-log",
                 },
               }),
