@@ -54,6 +54,9 @@ jobs:
           cmdline-tools-version: 13114758
           packages: "tools platform-tools platforms;android-35 build-tools;35.0.0"
 
+      - name: Set Android test version
+        run: make version SEMVER=0.1.0
+
       - name: Initialise build environment
         run: make init
 
