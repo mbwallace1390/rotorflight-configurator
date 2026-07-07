@@ -54,6 +54,23 @@ jobs:
           cmdline-tools-version: 13114758
           packages: "tools platform-tools platforms;android-35 build-tools;35.0.0"
 
+      - name: Give handoff test a separate Android identity
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("cordova/config_template.xml")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              'id="org.rotorflight.rotorflightconfigurator"',
+              'id="org.rotorflight.rotorflightconfigurator.handofftest"',
+          )
+          text = text.replace(
+              '<name>{{name}}</name>',
+              '<name>{{name}} Handoff Test</name>',
+          )
+          path.write_text(text, encoding="utf-8")
+
       - name: Set Android test version
         run: make version SEMVER=0.1.0
 
