@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - android-blackbox-handoff
-    paths:
-      - ".github/workflows/format-android-handoff.yml"
 
 permissions:
   contents: write
