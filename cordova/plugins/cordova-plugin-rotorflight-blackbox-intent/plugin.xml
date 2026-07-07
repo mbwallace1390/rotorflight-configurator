@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        id="cordova-plugin-rotorflight-blackbox-intent"
+        version="1.0.0">
+
+    <name>Rotorflight Blackbox Intent</name>
+    <description>Securely opens a downloaded Rotorflight Blackbox log in the Android viewer.</description>
+    <license>GPL-3.0</license>
+
+    <js-module src="www/blackboxIntent.js" name="BlackboxIntent">
+        <clobbers target="cordova.plugins.blackboxIntent" />
+    </js-module>
+
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="BlackboxIntent">
+                <param name="android-package" value="org.rotorflight.blackboxintent.BlackboxIntent" />
+            </feature>
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/manifest/application">
+            <provider
+                android:name="androidx.core.content.FileProvider"
+                android:authorities="${applicationId}.blackboxfiles"
+                android:exported="false"
+                android:grantUriPermissions="true">
+                <meta-data
+                    android:name="android.support.FILE_PROVIDER_PATHS"
+                    android:resource="@xml/blackbox_file_paths" />
+            </provider>
+
+            <activity
+                android:name="org.rotorflight.blackboxintent.BlackboxPickerActivity"
+                android:excludeFromRecents="true"
+                android:exported="false"
+                android:launchMode="singleTop"
+                android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+        </config-file>
+
+        <source-file
+            src="src/android/BlackboxIntent.java"
+            target-dir="src/org/rotorflight/blackboxintent" />
+
+        <source-file
+            src="src/android/BlackboxPickerActivity.java"
+            target-dir="src/org/rotorflight/blackboxintent" />
+
+        <resource-file
+            src="src/android/blackbox_file_paths.xml"
+            target="res/xml/blackbox_file_paths.xml" />
+    </platform>
+</plugin>

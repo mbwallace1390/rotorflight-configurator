@@ -19,6 +19,8 @@ mount(Logo, { target: document.querySelector("#logo-desktop") });
 mount(Logo, { target: document.querySelector("#logo-mobile") });
 
 if (__BACKEND__ === "cordova") {
+  import("@/js/android_blackbox_handoff.js");
+
   (async () => {
     const cordovaStartup = await import("@/js/cordova_startup.js");
     Object.assign(globalThis, {
