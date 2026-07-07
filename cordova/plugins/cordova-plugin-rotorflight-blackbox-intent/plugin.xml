@@ -29,10 +29,21 @@
                     android:name="android.support.FILE_PROVIDER_PATHS"
                     android:resource="@xml/blackbox_file_paths" />
             </provider>
+
+            <activity
+                android:name="org.rotorflight.blackboxintent.BlackboxPickerActivity"
+                android:excludeFromRecents="true"
+                android:exported="false"
+                android:launchMode="singleTop"
+                android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
         </config-file>
 
         <source-file
             src="src/android/BlackboxIntent.java"
+            target-dir="src/org/rotorflight/blackboxintent" />
+
+        <source-file
+            src="src/android/BlackboxPickerActivity.java"
             target-dir="src/org/rotorflight/blackboxintent" />
 
         <resource-file
