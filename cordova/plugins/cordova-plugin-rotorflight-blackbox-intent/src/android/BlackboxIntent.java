@@ -2,9 +2,12 @@ package org.rotorflight.blackboxintent;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
 
@@ -21,6 +24,8 @@ public final class BlackboxIntent extends CordovaPlugin {
     private static final String ACTION_PICK_AND_OPEN = "pickAndOpen";
     private static final int PICK_BLACKBOX_LOG_REQUEST = 4701;
     private static final String BLACKBOX_PACKAGE = "org.rotorflight.blackbox";
+    private static final String BLACKBOX_ACTIVITY =
+        "org.rotorflight.blackbox.MainActivity";
     private static final String BLACKBOX_MIME_TYPE = "application/x-blackbox-log";
 
     private CallbackContext pendingPickerCallback;
@@ -75,6 +80,7 @@ public final class BlackboxIntent extends CordovaPlugin {
                     PICK_BLACKBOX_LOG_REQUEST
                 );
             } catch (ActivityNotFoundException error) {
+                showNativeError("Android Files could not be opened.");
                 finishPickerWithError("no_document_picker");
             }
         });
@@ -90,6 +96,7 @@ public final class BlackboxIntent extends CordovaPlugin {
         pendingPickerCallback = null;
 
         if (callbackContext == null) {
+            showNativeError("The Blackbox file selection was lost. Please try again.");
             return;
         }
 
@@ -136,12 +143,14 @@ public final class BlackboxIntent extends CordovaPlugin {
                     : fileUrl;
 
                 if (filePath == null) {
+                    showNativeError("The selected Blackbox file path is invalid.");
                     callbackContext.error("invalid_file_url");
                     return;
                 }
 
                 File file = new File(filePath);
                 if (!file.isFile()) {
+                    showNativeError("The selected Blackbox file could not be found.");
                     callbackContext.error("file_not_found");
                     return;
                 }
@@ -155,6 +164,7 @@ public final class BlackboxIntent extends CordovaPlugin {
 
             openBlackbox(sharedUri, callbackContext);
         } catch (IllegalArgumentException | SecurityException error) {
+            showNativeError("Android could not share the selected Blackbox log.");
             callbackContext.error("unable_to_share_log: " + error.getMessage());
         }
     }
@@ -165,24 +175,33 @@ public final class BlackboxIntent extends CordovaPlugin {
         activity.runOnUiThread(() -> {
             try {
                 Intent intent = new Intent(Intent.ACTION_VIEW)
+                    .setComponent(new ComponentName(BLACKBOX_PACKAGE, BLACKBOX_ACTIVITY))
                     .setDataAndType(sharedUri, BLACKBOX_MIME_TYPE)
-                    .setPackage(BLACKBOX_PACKAGE)
+                    .setClipData(ClipData.newRawUri("Rotorflight Blackbox log", sharedUri))
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
-                activity.grantUriPermission(
-                    BLACKBOX_PACKAGE,
-                    sharedUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                );
                 activity.startActivity(intent);
                 callbackContext.success();
             } catch (ActivityNotFoundException error) {
+                showNativeError("Rotorflight Blackbox Android is not installed.");
                 callbackContext.error("blackbox_not_installed");
             } catch (IllegalArgumentException | SecurityException error) {
+                showNativeError("Android blocked access to the selected Blackbox log.");
                 callbackContext.error("unable_to_share_log: " + error.getMessage());
+            } catch (RuntimeException error) {
+                showNativeError("Rotorflight Blackbox could not be opened.");
+                callbackContext.error("unable_to_open_blackbox: " + error.getMessage());
             }
         });
+    }
+
+    private void showNativeError(String message) {
+        Activity activity = cordova.getActivity();
+        activity.runOnUiThread(() ->
+            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+        );
     }
 
     @Override
